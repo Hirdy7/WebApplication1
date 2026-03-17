@@ -13,8 +13,8 @@ namespace WebApplication1.Models
         public string Name { get; set; } = string.Empty;
         public int? Age { get; set; }
 
-        public string? AvatarUrl { get; set; }
-
+        public string? photoUrl { get; set; }
+        
         public string Role { get; set; } = "User";
 
         public int TotalPoints { get; set; }

@@ -15,13 +15,12 @@ namespace WebApplication1
         {
             var builder = WebApplication.CreateBuilder(args);
 
-            // ---------------- KESTREL ----------------
             builder.WebHost.ConfigureKestrel(o =>
             {
                 o.ListenLocalhost(5000);
             });
 
-            // ---------------- CORS ----------------
+            
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowMobileApp", policy =>
@@ -36,12 +35,11 @@ namespace WebApplication1
                 });
             });
 
-            // ---------------- DB ----------------
+            
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseNpgsql(
                     builder.Configuration.GetConnectionString("DefaultConnection")));
 
-            // ---------------- JWT ----------------
             builder.Services.Configure<JwtSettings>(
                 builder.Configuration.GetSection("Jwt"));
 
@@ -106,7 +104,7 @@ namespace WebApplication1
             builder.Services.AddScoped<AuthService>();
 
             var app = builder.Build();
-
+            app.UseStaticFiles();
             using (var scope = app.Services.CreateScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -129,7 +127,7 @@ namespace WebApplication1
             app.UseAuthentication();
             app.UseAuthorization();
 
-          
+            
             app.MapControllers();
 
             app.Run();

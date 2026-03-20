@@ -20,6 +20,8 @@ namespace WebApplication1.Models
         public int TotalPoints { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public string? ResetCode { get; set; }
+        public DateTime? ResetCodeExpires { get; set; }
 
         public ICollection<DisposalRequest> DisposalRequests { get; set; } = new List<DisposalRequest>();
 

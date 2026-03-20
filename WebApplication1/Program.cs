@@ -102,6 +102,7 @@ namespace WebApplication1
             });
 
             builder.Services.AddScoped<AuthService>();
+            builder.Services.AddTransient<EmailService>();
 
             var app = builder.Build();
             app.UseStaticFiles();

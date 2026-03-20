@@ -19,7 +19,9 @@ namespace WebApplication1.Data
         public DbSet<Notification> Notifications { get; set; }
         public DbSet<UserDevice> UserDevices { get; set; }
 
-        public DbSet<Achivment> Achivments { get; set; }
+        public DbSet<Achievement> Achievements { get; set; }
+        public DbSet<UserAchievement> UserAchievements { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

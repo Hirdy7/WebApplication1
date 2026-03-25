@@ -26,7 +26,7 @@ namespace WebApplication1
                 options.AddPolicy("AllowMobileApp", policy =>
                 {
                     policy.WithOrigins(
-                        "http://localhost:8080",
+                        "http://localhost:5173",
                         "capacitor://localhost",
                         "ionic://localhost")
                     .AllowAnyHeader()

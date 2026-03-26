@@ -44,7 +44,6 @@ namespace WebApplication1.Controllers
             return Ok(points);
         }
 
-        
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
@@ -93,6 +92,16 @@ namespace WebApplication1.Controllers
             await _context.SaveChangesAsync();
 
             return CreatedAtAction(nameof(GetById), new { id = model.Id }, model);
+        }
+        [HttpGet("{id}/waste-types")]
+        public async Task<IActionResult> GetWasteTypes(Guid id)
+        {
+            var types = await _context.DisposalPointWasteTypes
+                .Where(pw => pw.DisposalPointId == id)
+                .Select(pw => pw.WasteType.Name) // Выбираем только названия
+                .ToListAsync();
+
+            return Ok(types);
         }
 
         [Authorize(Policy = "AdminOnly")]

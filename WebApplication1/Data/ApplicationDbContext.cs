@@ -67,21 +67,21 @@ namespace WebApplication1.Data
                     .HasMaxLength(100);
             });
 
-            
-            modelBuilder.Entity<DisposalPointWasteType>(entity =>
-            {
-                entity.HasKey(e => new { e.DisposalPointId, e.WasteTypeId });
 
-                entity.HasOne(e => e.DisposalPoint)
-                    .WithMany(p => p.DisposalPointWasteTypes)
-                    .HasForeignKey(e => e.DisposalPointId);
+            modelBuilder.Entity<DisposalPointWasteType>()
+        .HasKey(pw => new { pw.DisposalPointId, pw.WasteTypeId });
 
-                entity.HasOne(e => e.WasteType)
-                    .WithMany(w => w.DisposalPointWasteTypes)
-                    .HasForeignKey(e => e.WasteTypeId);
-            });
+            modelBuilder.Entity<DisposalPointWasteType>()
+                .HasOne(pw => pw.DisposalPoint)
+                .WithMany(p => p.DisposalPointWasteTypes)
+                .HasForeignKey(pw => pw.DisposalPointId);
 
-            
+            modelBuilder.Entity<DisposalPointWasteType>()
+                .HasOne(pw => pw.WasteType)
+                .WithMany() 
+                .HasForeignKey(pw => pw.WasteTypeId);
+
+
             modelBuilder.Entity<DisposalRequest>(entity =>
             {
                 entity.HasKey(e => e.Id);

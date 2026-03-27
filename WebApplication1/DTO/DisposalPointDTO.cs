@@ -13,5 +13,7 @@
         public string Address { get; set; } = string.Empty;
 
         public List<string> WasteTypes { get; set; } = new();
+
+        public string? PhotoUrl{ get; set; }
     }
 }

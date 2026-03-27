@@ -129,7 +129,7 @@ namespace WebApplication1.Controllers
 
         [Authorize(Policy = "AdminOnly")]
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(Guid id, DisposalPoint model)
+        public async Task<IActionResult> Update(Guid id, [FromBody] DisposalPoint model)
         {
             var point = await _context.DisposalPoints.FindAsync(id);
 
@@ -141,12 +141,19 @@ namespace WebApplication1.Controllers
             point.Longitude = model.Longitude;
             point.Address = model.Address;
 
+           
+            if (!string.IsNullOrEmpty(model.PhotoUrl))
+            {
+                point.PhotoUrl = model.PhotoUrl;
+            }
+
             await _context.SaveChangesAsync();
 
-            return NoContent();
+            return Ok(point);
         }
 
-        
+
+
         [Authorize(Policy = "AdminOnly")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
@@ -160,6 +167,51 @@ namespace WebApplication1.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+
+        [Authorize(Policy = "AdminOnly")]
+        [HttpPost("{id}/upload-photo")]
+        public async Task<IActionResult> UploadPointPhoto(Guid id, IFormFile file)
+        {
+            // 1. Проверяем, существует ли такая точка
+            var point = await _context.DisposalPoints.FindAsync(id);
+            if (point == null) return NotFound("Точка сбора не найдена");
+
+            // 2. Валидация файла
+            if (file == null || file.Length == 0)
+                return BadRequest("Файл не выбран или пуст");
+
+            // 3. Подготовка пути (используем папку images, как в методе Create)
+            var imagesPath = Path.Combine(_env.WebRootPath, "images");
+            if (!Directory.Exists(imagesPath)) Directory.CreateDirectory(imagesPath);
+
+            // 4. Генерация уникального имени
+            var ext = Path.GetExtension(file.FileName).ToLower();
+            var fileName = $"{Guid.NewGuid()}{ext}";
+            var filePath = Path.Combine(imagesPath, fileName);
+
+            // 5. Сохранение файла на диск
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // 6. Формирование URL (с учетом специфики Android эмулятора 10.0.2.2)
+            var request = HttpContext.Request;
+            var host = request.Host.Value.Replace("localhost", "10.0.2.2");
+            var baseUrl = $"{request.Scheme}://{host}";
+
+            // Сохраняем полный путь в базу
+            point.PhotoUrl = $"{baseUrl}/images/{fileName}";
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = "Фото точки успешно обновлено",
+                photoUrl = point.PhotoUrl
+            });
         }
     }
 }

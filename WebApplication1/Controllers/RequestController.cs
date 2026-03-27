@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using WebApplication1.Data;
@@ -76,9 +77,82 @@ namespace WebApplication1.Controllers
             }
             catch (DbUpdateException ex)
             {
-                // Дополнительная ловушка для ошибок базы
                 return StatusCode(500, new { message = "Ошибка сохранения в базу данных", details = ex.InnerException?.Message });
             }
+        }
+
+        // 1. Получить все заявки (для админ-панели)
+        [HttpGet("all")]
+        [Authorize(Roles = "Admin")] // Только для админов
+        public async Task<IActionResult> GetAllRequests()
+        {
+            var requests = await _context.DisposalRequests
+                .Include(r => r.User) // Чтобы видеть кто отправил
+                .Include(r => r.DisposalPoint) // Чтобы видеть куда принесли
+                .OrderByDescending(r => r.CreatedAt)
+                .Select(r => new
+                {
+                    r.Id,
+                    UserName = r.User.Name,
+                    PointName = r.DisposalPoint.Name,
+                    r.Comment,
+                    r.PhotoUrl,
+                    r.Status,
+                    r.CreatedAt
+                })
+                .ToListAsync();
+
+            return Ok(requests);
+        }
+
+        [HttpPatch("{id}/status")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateStatusDto dto)
+        {
+            var request = await _context.DisposalRequests
+                .Include(r => r.User)
+                .Include(r => r.WasteType)
+                .FirstOrDefaultAsync(r => r.Id == id);
+
+            if (request == null) return NotFound("Заявка не найдена");
+
+            if (request.Status != DisposalRequestStatus.Pending)
+            {
+                return BadRequest("Эта заявка уже была обработана ранее");
+            }
+
+            if (dto.NewStatus == DisposalRequestStatus.Approved)
+            {
+                if (request.WasteType == null)
+                {
+                    return BadRequest("Ошибка: тип отходов для этой заявки не определен в БД");
+                }
+
+                // Берем баллы из справочника WasteTypes
+                int pointsFromDb = request.WasteType.Rewards;
+
+                // Начисляем пользователю
+                request.User.TotalPoints += pointsFromDb;
+
+                // Сохраняем в заявку для истории
+                request.PointsAwarded = pointsFromDb;
+                request.Status = DisposalRequestStatus.Approved;
+                request.ReviewedAt = DateTime.UtcNow;
+            }
+            else if (dto.NewStatus == DisposalRequestStatus.Rejected)
+            {
+                request.Status = DisposalRequestStatus.Rejected;
+                request.ReviewedAt = DateTime.UtcNow;
+            }
+
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                message = $"Статус обновлен на {request.Status}",
+                pointsEarned = request.PointsAwarded ?? 0,
+                totalUserPoints = request.User.TotalPoints
+            });
         }
     }
 }

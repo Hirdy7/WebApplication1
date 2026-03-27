@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WebApplication1.Data;
@@ -11,9 +12,11 @@ using WebApplication1.Data;
 namespace WebApplication1.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260326112838_FixRequest")]
+    partial class FixRequest
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -114,9 +117,14 @@ namespace WebApplication1.Migrations
                     b.Property<Guid>("WasteTypeId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("WasteTypeId1")
+                        .HasColumnType("uuid");
+
                     b.HasKey("DisposalPointId", "WasteTypeId");
 
                     b.HasIndex("WasteTypeId");
+
+                    b.HasIndex("WasteTypeId1");
 
                     b.ToTable("DisposalPointWasteTypes");
                 });
@@ -435,10 +443,14 @@ namespace WebApplication1.Migrations
                         .IsRequired();
 
                     b.HasOne("WebApplication1.Models.WasteType", "WasteType")
-                        .WithMany("DisposalPointWasteTypes")
+                        .WithMany()
                         .HasForeignKey("WasteTypeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("WebApplication1.Models.WasteType", null)
+                        .WithMany("DisposalPointWasteTypes")
+                        .HasForeignKey("WasteTypeId1");
 
                     b.Navigation("DisposalPoint");
 

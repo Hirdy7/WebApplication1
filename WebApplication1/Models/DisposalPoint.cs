@@ -13,7 +13,6 @@ namespace WebApplication1.Models
         public string? PhotoUrl { get; set; }
         public bool IsActive { get; set; } = true;
 
-       
         public ICollection<DisposalPointWasteType> DisposalPointWasteTypes { get; set; }
             = new List<DisposalPointWasteType>();
     }

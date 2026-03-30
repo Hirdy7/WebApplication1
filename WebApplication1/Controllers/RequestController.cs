@@ -24,25 +24,31 @@ namespace WebApplication1.Controllers
         [HttpPost("send")]
         public async Task<IActionResult> CreateRequest([FromForm] CreateDisposalRequestDto dto)
         {
-            // 1. Безопасное получение ID пользователя
+            // 1. Получение ID пользователя
             var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (string.IsNullOrEmpty(userIdString) || !Guid.TryParse(userIdString, out var userId))
             {
-                return Unauthorized(new { message = "Пользователь не авторизован или токен невалиден" });
+                return Unauthorized(new { message = "Пользователь не авторизован" });
             }
 
-            // 2. ПРОВЕРКА СУЩЕСТВОВАНИЯ ТОЧКИ (Решает твою ошибку 500)
+            // 2. Проверка точки (Используем Guid, если в базе Guid)
             var pointExists = await _context.DisposalPoints.AnyAsync(p => p.Id == dto.DisposalPointId);
             if (!pointExists)
             {
-                return BadRequest(new { message = $"Точка с ID {dto.DisposalPointId} не найдена. Обновите карту в приложении." });
+                return BadRequest(new { message = "Точка не найдена" });
             }
 
-            // 3. Обработка и сохранение фото
+            // 3. Проверка типа мусора (Исправляет ошибку внешнего ключа)
+            var wasteTypeExists = await _context.WasteTypes.AnyAsync(w => w.Id == dto.WasteTypeId);
+            if (!wasteTypeExists)
+            {
+                return BadRequest(new { message = "Указанный тип мусора не существует" });
+            }
+
+            // 4. Сохранение фото
             if (dto.Photo == null || dto.Photo.Length == 0)
                 return BadRequest(new { message = "Фото обязательно" });
 
-            // Убедимся, что папка wwwroot/reports существует
             string reportsFolder = Path.Combine(_env.WebRootPath, "reports");
             if (!Directory.Exists(reportsFolder)) Directory.CreateDirectory(reportsFolder);
 
@@ -54,13 +60,13 @@ namespace WebApplication1.Controllers
                 await dto.Photo.CopyToAsync(fileStream);
             }
 
-            // 4. Создание записи в БД
+            // 5. Создание записи в БД
             var newRequest = new DisposalRequest
             {
                 Id = Guid.NewGuid(),
                 UserId = userId,
                 DisposalPointId = dto.DisposalPointId,
-                // Сохраняем тип мусора и комментарий
+                WasteTypeId = dto.WasteTypeId, // ПЕРЕДАЕМ ID ТИПА МУСОРА
                 Comment = string.IsNullOrWhiteSpace(dto.Comment)
                     ? dto.WasteType
                     : $"{dto.WasteType}: {dto.Comment}",
@@ -77,7 +83,7 @@ namespace WebApplication1.Controllers
             }
             catch (DbUpdateException ex)
             {
-                return StatusCode(500, new { message = "Ошибка сохранения в базу данных", details = ex.InnerException?.Message });
+                return StatusCode(500, new { message = "Ошибка сохранения", details = ex.InnerException?.Message });
             }
         }
 

@@ -69,17 +69,17 @@ namespace WebApplication1.Data
 
 
             modelBuilder.Entity<DisposalPointWasteType>()
-        .HasKey(pw => new { pw.DisposalPointId, pw.WasteTypeId });
-
-            modelBuilder.Entity<DisposalPointWasteType>()
-      .HasOne(pw => pw.WasteType)
-      .WithMany(w => w.DisposalPointWasteTypes) 
-      .HasForeignKey(pw => pw.WasteTypeId);
+    .HasKey(pw => new { pw.DisposalPointId, pw.WasteTypeId });
 
             modelBuilder.Entity<DisposalPointWasteType>()
                 .HasOne(pw => pw.DisposalPoint)
                 .WithMany(p => p.DisposalPointWasteTypes) 
                 .HasForeignKey(pw => pw.DisposalPointId);
+
+            modelBuilder.Entity<DisposalPointWasteType>()
+                .HasOne(pw => pw.WasteType)
+                .WithMany(w => w.DisposalPointWasteTypes) 
+                .HasForeignKey(pw => pw.WasteTypeId);
 
 
             modelBuilder.Entity<DisposalRequest>(entity =>

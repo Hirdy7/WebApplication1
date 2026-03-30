@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using WebApplication1.Data;
+using WebApplication1.DTO;
 using WebApplication1.Models;
 
 namespace WebApplication1.Controllers
@@ -93,15 +94,23 @@ namespace WebApplication1.Controllers
 
             return CreatedAtAction(nameof(GetById), new { id = model.Id }, model);
         }
+
         [HttpGet("{id}/waste-types")]
-        public async Task<IActionResult> GetWasteTypes(Guid id)
+        public async Task<ActionResult<IEnumerable<WasteTypeDto>>> GetWasteTypes(Guid id)
         {
-            var types = await _context.DisposalPointWasteTypes
-                .Where(pw => pw.DisposalPointId == id)
-                .Select(pw => pw.WasteType.Name) // Выбираем только названия
+            var wasteTypes = await _context.DisposalPointWasteTypes
+                .Where(dpwt => dpwt.DisposalPointId == id)
+                .Select(dpwt => new WasteTypeDto 
+                {
+                    Id = dpwt.WasteType.Id,
+                    Name = dpwt.WasteType.Name,
+                    Rewards = dpwt.WasteType.Rewards
+                })
                 .ToListAsync();
 
-            return Ok(types);
+            if (!wasteTypes.Any()) return NotFound("Типы не найдены");
+
+            return Ok(wasteTypes);
         }
 
         [Authorize(Policy = "AdminOnly")]

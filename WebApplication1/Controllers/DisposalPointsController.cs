@@ -22,10 +22,13 @@ namespace WebApplication1.Controllers
             _env = env;
         }
 
-      
+
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
+            // Динамический базовый URL (подстроится под эмулятор или сайт)
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+
             var points = await _context.DisposalPoints
                 .Include(p => p.DisposalPointWasteTypes)
                 .ThenInclude(pw => pw.WasteType)
@@ -33,12 +36,22 @@ namespace WebApplication1.Controllers
                 {
                     p.Id,
                     p.Name,
+                    // ОБЯЗАТЕЛЬНО ВОЗВРАЩАЕМ КООРДИНАТЫ (без них карта пустая)
                     p.Latitude,
                     p.Longitude,
                     p.Address,
-                    p.PhotoUrl,
+
+                    // Исправленная логика фото
+                    PhotoUrl = string.IsNullOrEmpty(p.PhotoUrl)
+                        ? null
+                        : (p.PhotoUrl.StartsWith("http")
+                            ? p.PhotoUrl
+                            : $"{baseUrl}{(p.PhotoUrl.StartsWith("/") ? "" : "/")}{p.PhotoUrl}"),
+
+                    // ВОЗВРАЩАЕМ ТИПЫ (чтобы не было 404 при клике)
                     WasteTypes = p.DisposalPointWasteTypes
                         .Select(x => x.WasteType.Name)
+                        .ToList()
                 })
                 .ToListAsync();
 
@@ -49,44 +62,40 @@ namespace WebApplication1.Controllers
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
-            var point = await _context.DisposalPoints
-                .Include(p => p.DisposalPointWasteTypes)
-                .ThenInclude(pw => pw.WasteType)
-                .FirstOrDefaultAsync(p => p.Id == id);
+            var point = await _context.DisposalPoints.FindAsync(id);
+            if (point == null) return NotFound();
 
-            if (point == null)
-                return NotFound();
+            var host = Request.Host.Value.Replace("localhost", "10.0.2.2");
+            var baseUrl = $"{Request.Scheme}://{host}";
+
+            if (!string.IsNullOrEmpty(point.PhotoUrl))
+            {
+                point.PhotoUrl = baseUrl + point.PhotoUrl;
+            }
 
             return Ok(point);
         }
 
 
-        [Authorize(Policy = "AdminOnly")]
+        [Authorize(Policy = "ModeratorOnly")]
         [HttpPost]
         public async Task<IActionResult> Create([FromForm] DisposalPoint model, IFormFile? image)
         {
+            if (!ModelState.IsValid) return BadRequest(ModelState);
+
             if (image != null && image.Length > 0)
             {
-                var imagesPath = Path.Combine(_env.WebRootPath, "images");
-                if (!Directory.Exists(imagesPath))
-                    Directory.CreateDirectory(imagesPath);
+                var fileName = $"{Guid.NewGuid()}{Path.GetExtension(image.FileName).ToLower()}";
+                var savePath = Path.Combine(_env.WebRootPath, "images", fileName);
 
-                var ext = Path.GetExtension(image.FileName).ToLower();
-                var fileName = $"{Guid.NewGuid()}{ext}";
-                var savePath = Path.Combine(imagesPath, fileName);
+                
+                Directory.CreateDirectory(Path.GetDirectoryName(savePath)!);
 
                 using (var stream = new FileStream(savePath, FileMode.Create))
                 {
                     await image.CopyToAsync(stream);
                 }
-
-                var request = HttpContext.Request;
-                
-                var host = request.Host.Value.Replace("localhost", "10.0.2.2");
-                var baseUrl = $"{request.Scheme}://{host}";
-
-                model.PhotoUrl = $"{baseUrl}/images/{fileName}";
-
+                model.PhotoUrl = $"/images/{fileName}";
             }
 
             _context.DisposalPoints.Add(model);
@@ -94,6 +103,8 @@ namespace WebApplication1.Controllers
 
             return CreatedAtAction(nameof(GetById), new { id = model.Id }, model);
         }
+
+
 
         [HttpGet("{id}/waste-types")]
         public async Task<ActionResult<IEnumerable<WasteTypeDto>>> GetWasteTypes(Guid id)
@@ -113,7 +124,7 @@ namespace WebApplication1.Controllers
             return Ok(wasteTypes);
         }
 
-        [Authorize(Policy = "AdminOnly")]
+        [Authorize(Policy = "ModeratorOnly")]
         [HttpPost("add-waste-type")]
         public async Task<IActionResult> AddWasteTypeToPoint(Guid pointId, Guid wasteTypeId)
         {
@@ -136,7 +147,7 @@ namespace WebApplication1.Controllers
             return Ok(new { message = "Тип отходов успешно привязан к точке" });
         }
 
-        [Authorize(Policy = "AdminOnly")]
+        [Authorize(Policy = "ModeratorOnly")]
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] DisposalPoint model)
         {
@@ -163,7 +174,7 @@ namespace WebApplication1.Controllers
 
 
 
-        [Authorize(Policy = "AdminOnly")]
+        [Authorize(Policy = "ModeratorOnly")]
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
@@ -179,47 +190,43 @@ namespace WebApplication1.Controllers
         }
 
 
-        [Authorize(Policy = "AdminOnly")]
+        [Authorize(Policy = "ModeratorOnly")]
         [HttpPost("{id}/upload-photo")]
         public async Task<IActionResult> UploadPointPhoto(Guid id, IFormFile file)
         {
-            // 1. Проверяем, существует ли такая точка
             var point = await _context.DisposalPoints.FindAsync(id);
             if (point == null) return NotFound("Точка сбора не найдена");
 
-            // 2. Валидация файла
             if (file == null || file.Length == 0)
                 return BadRequest("Файл не выбран или пуст");
 
-            // 3. Подготовка пути (используем папку images, как в методе Create)
+            // 1. Подготовка пути (внутри wwwroot/images)
             var imagesPath = Path.Combine(_env.WebRootPath, "images");
             if (!Directory.Exists(imagesPath)) Directory.CreateDirectory(imagesPath);
 
-            // 4. Генерация уникального имени
+            // 2. Генерация уникального имени
             var ext = Path.GetExtension(file.FileName).ToLower();
             var fileName = $"{Guid.NewGuid()}{ext}";
             var filePath = Path.Combine(imagesPath, fileName);
 
-            // 5. Сохранение файла на диск
+            // 3. Сохранение файла на диск
             using (var stream = new FileStream(filePath, FileMode.Create))
             {
                 await file.CopyToAsync(stream);
             }
 
-            // 6. Формирование URL (с учетом специфики Android эмулятора 10.0.2.2)
-            var request = HttpContext.Request;
-            var host = request.Host.Value.Replace("localhost", "10.0.2.2");
-            var baseUrl = $"{request.Scheme}://{host}";
-
-            // Сохраняем полный путь в базу
-            point.PhotoUrl = $"{baseUrl}/images/{fileName}";
-
+            // 4. СОХРАНЯЕМ В БАЗУ ТОЛЬКО ОТНОСИТЕЛЬНЫЙ ПУТЬ
+            // Это залог того, что при смене домена или IP всё не сломается
+            point.PhotoUrl = $"/images/{fileName}";
             await _context.SaveChangesAsync();
+
+            var baseUrl = $"{Request.Scheme}://{Request.Host}";
+            var fullPhotoUrl = $"{baseUrl}{point.PhotoUrl}";
 
             return Ok(new
             {
                 message = "Фото точки успешно обновлено",
-                photoUrl = point.PhotoUrl
+                photoUrl = fullPhotoUrl // Возвращаем полный путь, чтобы мобила сразу отобразила
             });
         }
     }

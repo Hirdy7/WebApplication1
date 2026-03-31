@@ -67,7 +67,8 @@ namespace WebApplication1
             builder.Services.AddAuthorization(options =>
             {
                 options.AddPolicy("AdminOnly", p => p.RequireRole("Admin"));
-                options.AddPolicy("UserOnly", p => p.RequireRole("User", "Admin"));
+                options.AddPolicy("ModeratorOnly", p => p.RequireRole("Moderator", "Admin"));
+                options.AddPolicy("UserOnly", p => p.RequireRole("User", "Admin","Moderator"));
             });
 
             builder.Services.AddControllers();

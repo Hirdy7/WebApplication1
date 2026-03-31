@@ -21,6 +21,34 @@ namespace WebApplication1.Controllers
             _env = env;
         }
 
+        [Authorize(Roles = "Admin")] 
+        [HttpGet("alladmin")]
+        public async Task<IActionResult> GetAll()
+        {
+            var requests = await _context.DisposalRequests
+                .Include(r => r.User)           // Загружаем данные пользователя
+                .Include(r => r.DisposalPoint)  // Загружаем данные о точке
+                .Include(r => r.WasteType)      // Загружаем данные о типе мусора
+                .OrderByDescending(r => r.CreatedAt) // Сначала новые
+                .Select(r => new
+                {
+                    r.Id,
+                    UserName = r.User.Name,      // Или r.User.Email, смотря что у вас в модели User
+                    PointName = r.DisposalPoint.Name,
+                    WasteTypeName = r.WasteType.Name,
+                    r.PhotoUrl,
+                    r.Weight,
+                    r.Comment,
+                    Status = r.Status.ToString(), // Превращаем Enum в строку для удобства фронтенда
+                    r.PointsAwarded,
+                    r.CreatedAt,
+                    r.ReviewedAt
+                })
+                .ToListAsync();
+
+            return Ok(requests);
+        }
+
         [HttpPost("send")]
         public async Task<IActionResult> CreateRequest([FromForm] CreateDisposalRequestDto dto)
         {
@@ -89,7 +117,7 @@ namespace WebApplication1.Controllers
 
         // 1. Получить все заявки (для админ-панели)
         [HttpGet("all")]
-        [Authorize(Roles = "Admin")] // Только для админов
+        [Authorize(Roles = "Admin")] 
         public async Task<IActionResult> GetAllRequests()
         {
             var requests = await _context.DisposalRequests

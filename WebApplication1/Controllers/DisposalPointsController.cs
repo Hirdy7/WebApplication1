@@ -58,6 +58,24 @@ namespace WebApplication1.Controllers
             return Ok(points);
         }
 
+        [HttpGet("waste-types-list")]
+        public async Task<IActionResult> GetWasteTypesList()
+        {
+            var types = await _context.WasteTypes
+                .AsNoTracking()
+                .Select(t => new
+                {
+                    t.Id,
+                    t.Name,
+                    t.Description,
+                    t.Rewards
+                })
+                .OrderBy(t => t.Name)
+                .ToListAsync();
+
+            return Ok(types);
+        }
+
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)

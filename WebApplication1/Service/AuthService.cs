@@ -126,10 +126,11 @@ namespace WebApplication1.Service
             return tokenHandler.WriteToken(token);
         }
 
-        public async Task CreateDefaultAdmin()
+        public async Task CreateDefaultData()
         {
             try
             {
+                // 1. Инициализация Администратора
                 var adminExists = await _context.Users
                     .AsNoTracking()
                     .AnyAsync(u => u.Email == "admin@admin.com");
@@ -143,20 +144,64 @@ namespace WebApplication1.Service
                         Role = "Admin",
                         Name = "Administrator"
                     };
-
                     _context.Users.Add(admin);
-                    await _context.SaveChangesAsync();
-
                     Console.WriteLine(" Администратор успешно создан.");
                 }
-                else
+
+                // 2. Инициализация Типов Отходов
+                var wasteTypesExist = await _context.WasteTypes.AnyAsync();
+
+                if (!wasteTypesExist)
                 {
-                    Console.WriteLine(" Администратор уже существует.");
+                    var defaultWasteTypes = new List<WasteType>
+            {
+                new WasteType
+                {
+                    Id = Guid.Parse("468f7798-268e-4252-9c3f-c24749f7b101"),
+                    Name = "Пластик",
+                    Description = "ПЭТ-бутылки, пластиковые контейнеры (маркировка 1, 2)",
+                    Rewards = 10
+                },
+                new WasteType
+                {
+                    Id = Guid.Parse("71398864-4e7a-426b-952b-7c3905f56314"),
+                    Name = "Стекло",
+                    Description = "Стеклянные бутылки, банки (целые и битые)",
+                    Rewards = 15
+                },
+                new WasteType
+                {
+                    Id = Guid.Parse("a297906d-5654-444f-801a-8e8f8f97e201"),
+                    Name = "Бумага",
+                    Description = "Макулатура, картон, старые газеты",
+                    Rewards = 5
+                },
+                new WasteType
+                {
+                    Id = Guid.Parse("b512316e-1234-4567-890a-f0123456789b"),
+                    Name = "Металл",
+                    Description = "Алюминиевые банки, жесть",
+                    Rewards = 20
+                },
+                new WasteType
+                {
+                    Id = Guid.Parse("c9876543-abcd-ef01-2345-6789abcdef01"),
+                    Name = "Батарейки",
+                    Description = "Опасные отходы, пальчиковые и мизинчиковые батарейки",
+                    Rewards = 50
                 }
+            };
+
+                    _context.WasteTypes.AddRange(defaultWasteTypes);
+                    Console.WriteLine(" Дефолтные типы отходов добавлены.");
+                }
+
+                // Сохраняем все изменения одним махом
+                await _context.SaveChangesAsync();
             }
             catch (Exception ex)
             {
-                Console.WriteLine($" Ошибка при создании администратора: {ex.Message}");
+                Console.WriteLine($" Ошибка при инициализации данных: {ex.Message}");
             }
         }
 
@@ -164,10 +209,8 @@ namespace WebApplication1.Service
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
 
-            // Безопасность: даже если пользователя нет, мы не говорим об этом злоумышленнику
             if (user == null) return new ServiceResponse<bool> { IsSuccess = true };
 
-            // Генерируем 6-значный код
             var resetCode = new Random().Next(100000, 999999).ToString();
 
             user.ResetCode = resetCode;
@@ -175,13 +218,11 @@ namespace WebApplication1.Service
 
             await _context.SaveChangesAsync();
 
-            // Отправка письма (вызываем твой EmailService)
             await _emailService.SendEmailAsync(email, "Код восстановления пароля", $"Ваш код: {resetCode}");
 
             return new ServiceResponse<bool> { IsSuccess = true };
         }
 
-        // Метод 2: Сброс пароля (Проверка и сохранение)
         public async Task<ServiceResponse<bool>> ResetPasswordAsync(ResetPasswordRequest request)
         {
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);

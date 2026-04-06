@@ -21,7 +21,7 @@ namespace WebApplication1.Controllers
             _env = env;
         }
 
-        [Authorize(Roles = "Admin")] 
+        [Authorize(Policy = "ModeratorOnly")]
         [HttpGet("alladmin")]
         public async Task<IActionResult> GetAll()
         {
@@ -117,7 +117,7 @@ namespace WebApplication1.Controllers
 
         // 1. Получить все заявки (для админ-панели)
         [HttpGet("all")]
-        [Authorize(Roles = "Admin")] 
+        [Authorize(Policy = "ModeratorOnly")]
         public async Task<IActionResult> GetAllRequests()
         {
             var requests = await _context.DisposalRequests
@@ -140,7 +140,7 @@ namespace WebApplication1.Controllers
         }
 
         [HttpPatch("{id}/status")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Policy = "ModeratorOnly")]
         public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateStatusDto dto)
         {
             var request = await _context.DisposalRequests
@@ -155,6 +155,10 @@ namespace WebApplication1.Controllers
                 return BadRequest("Эта заявка уже была обработана ранее");
             }
 
+            // Записываем ответ админа/модератора (причину)
+            request.Response = dto.Response;
+            request.ReviewedAt = DateTime.UtcNow;
+
             if (dto.NewStatus == DisposalRequestStatus.Approved)
             {
                 if (request.WasteType == null)
@@ -162,28 +166,35 @@ namespace WebApplication1.Controllers
                     return BadRequest("Ошибка: тип отходов для этой заявки не определен в БД");
                 }
 
-                // Берем баллы из справочника WasteTypes
                 int pointsFromDb = request.WasteType.Rewards;
-
-                // Начисляем пользователю
                 request.User.TotalPoints += pointsFromDb;
-
-                // Сохраняем в заявку для истории
                 request.PointsAwarded = pointsFromDb;
                 request.Status = DisposalRequestStatus.Approved;
-                request.ReviewedAt = DateTime.UtcNow;
             }
             else if (dto.NewStatus == DisposalRequestStatus.Rejected)
             {
+                // Проверка: желательно, чтобы при отказе была указана причина
+                if (string.IsNullOrWhiteSpace(dto.Response))
+                {
+                    return BadRequest("При отказе необходимо указать причину в поле Response");
+                }
+
                 request.Status = DisposalRequestStatus.Rejected;
-                request.ReviewedAt = DateTime.UtcNow;
             }
 
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, "Ошибка при сохранении изменений");
+            }
 
             return Ok(new
             {
                 message = $"Статус обновлен на {request.Status}",
+                response = request.Response, // Возвращаем записанный текст для подтверждения
                 pointsEarned = request.PointsAwarded ?? 0,
                 totalUserPoints = request.User.TotalPoints
             });

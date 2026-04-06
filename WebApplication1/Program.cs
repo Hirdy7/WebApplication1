@@ -113,7 +113,7 @@ namespace WebApplication1
                 await db.Database.MigrateAsync();
 
                 var auth = scope.ServiceProvider.GetRequiredService<AuthService>();
-                await auth.CreateDefaultAdmin();
+                await auth.CreateDefaultData();
             }
 
           

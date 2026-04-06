@@ -26,6 +26,7 @@
 
         public string? Comment { get; set; }
 
+        public string? Response {  get; set; }
         public DisposalRequestStatus Status { get; set; }
             = DisposalRequestStatus.Pending;
 

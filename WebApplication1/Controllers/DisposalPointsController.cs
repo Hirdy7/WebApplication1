@@ -169,7 +169,9 @@ namespace WebApplication1.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] DisposalPoint model)
         {
-            var point = await _context.DisposalPoints.FindAsync(id);
+            var point = await _context.DisposalPoints
+                .Include(p => p.DisposalPointWasteTypes)
+                .FirstOrDefaultAsync(p => p.Id == id);
 
             if (point == null)
                 return NotFound();
@@ -178,14 +180,38 @@ namespace WebApplication1.Controllers
             point.Latitude = model.Latitude;
             point.Longitude = model.Longitude;
             point.Address = model.Address;
+            point.Description = model.Description;
+            point.IsActive = model.IsActive;
 
-           
             if (!string.IsNullOrEmpty(model.PhotoUrl))
             {
                 point.PhotoUrl = model.PhotoUrl;
             }
 
-            await _context.SaveChangesAsync();
+           
+            _context.DisposalPointWasteTypes.RemoveRange(point.DisposalPointWasteTypes);
+
+           
+            if (model.DisposalPointWasteTypes != null && model.DisposalPointWasteTypes.Any())
+            {
+                foreach (var wt in model.DisposalPointWasteTypes)
+                {
+                    point.DisposalPointWasteTypes.Add(new DisposalPointWasteType
+                    {
+                        DisposalPointId = id,
+                        WasteTypeId = wt.WasteTypeId
+                    });
+                }
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex)
+            {
+                return StatusCode(500, "Ошибка при обновлении связей типов отходов. Проверьте, существуют ли такие WasteTypeId.");
+            }
 
             return Ok(point);
         }

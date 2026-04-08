@@ -14,7 +14,7 @@ namespace WebApplication1.Controllers
     {
 
         private readonly ApplicationDbContext _context;
-        private readonly IWebHostEnvironment _env; 
+        private readonly IWebHostEnvironment _env;
 
         public DisposalPointsController(ApplicationDbContext context, IWebHostEnvironment env)
         {
@@ -49,9 +49,8 @@ namespace WebApplication1.Controllers
                             : $"{baseUrl}{(p.PhotoUrl.StartsWith("/") ? "" : "/")}{p.PhotoUrl}"),
 
                     // ВОЗВРАЩАЕМ ТИПЫ (чтобы не было 404 при клике)
-                    WasteTypes = p.DisposalPointWasteTypes
-                        .Select(x => x.WasteType.Name)
-                        .ToList()
+                    wasteTypeIds = p.DisposalPointWasteTypes.Select(wt => wt.WasteTypeId).ToList(),
+                    wasteTypeNames = p.DisposalPointWasteTypes.Select(wt => wt.WasteType.Name).ToList()
                 })
                 .ToListAsync();
 
@@ -106,7 +105,7 @@ namespace WebApplication1.Controllers
                 var fileName = $"{Guid.NewGuid()}{Path.GetExtension(image.FileName).ToLower()}";
                 var savePath = Path.Combine(_env.WebRootPath, "images", fileName);
 
-                
+
                 Directory.CreateDirectory(Path.GetDirectoryName(savePath)!);
 
                 using (var stream = new FileStream(savePath, FileMode.Create))
@@ -129,7 +128,7 @@ namespace WebApplication1.Controllers
         {
             var wasteTypes = await _context.DisposalPointWasteTypes
                 .Where(dpwt => dpwt.DisposalPointId == id)
-                .Select(dpwt => new WasteTypeDto 
+                .Select(dpwt => new WasteTypeDto
                 {
                     Id = dpwt.WasteType.Id,
                     Name = dpwt.WasteType.Name,
@@ -152,7 +151,7 @@ namespace WebApplication1.Controllers
             var wasteType = await _context.WasteTypes.FindAsync(wasteTypeId);
             if (wasteType == null) return NotFound("Тип отходов не найден");
 
-          
+
             var link = new DisposalPointWasteType
             {
                 DisposalPointId = pointId,
@@ -188,10 +187,10 @@ namespace WebApplication1.Controllers
                 point.PhotoUrl = model.PhotoUrl;
             }
 
-           
+
             _context.DisposalPointWasteTypes.RemoveRange(point.DisposalPointWasteTypes);
 
-           
+
             if (model.DisposalPointWasteTypes != null && model.DisposalPointWasteTypes.Any())
             {
                 foreach (var wt in model.DisposalPointWasteTypes)
@@ -213,7 +212,12 @@ namespace WebApplication1.Controllers
                 return StatusCode(500, "Ошибка при обновлении связей типов отходов. Проверьте, существуют ли такие WasteTypeId.");
             }
 
-            return Ok(point);
+            return Ok(new
+            {
+                id = point.Id,
+                name = point.Name,
+                message = "Точка успешно обновлена"
+            });
         }
 
 

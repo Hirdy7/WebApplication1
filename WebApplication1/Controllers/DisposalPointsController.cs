@@ -98,13 +98,18 @@ namespace WebApplication1.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromForm] DisposalPoint model, IFormFile? image)
         {
+            // 1. Проверяем валидность модели
             if (!ModelState.IsValid) return BadRequest(ModelState);
 
+            // 2. Генерируем новый Id для точки сразу (нам он нужен для связей)
+            var pointId = Guid.NewGuid();
+            model.Id = pointId;
+
+            // 3. Обработка изображения (ваш существующий код)
             if (image != null && image.Length > 0)
             {
                 var fileName = $"{Guid.NewGuid()}{Path.GetExtension(image.FileName).ToLower()}";
                 var savePath = Path.Combine(_env.WebRootPath, "images", fileName);
-
 
                 Directory.CreateDirectory(Path.GetDirectoryName(savePath)!);
 
@@ -115,8 +120,29 @@ namespace WebApplication1.Controllers
                 model.PhotoUrl = $"/images/{fileName}";
             }
 
+
+            if (model.DisposalPointWasteTypes != null && model.DisposalPointWasteTypes.Any())
+            {
+                // Принудительно проставляем DisposalPointId для каждой связи
+                foreach (var wt in model.DisposalPointWasteTypes)
+                {
+                    wt.DisposalPointId = pointId;
+                    // Обнуляем навигационные свойства, чтобы EF не пытался создать новые WasteType
+                    wt.DisposalPoint = null;
+                    wt.WasteType = null;
+                }
+            }
+
             _context.DisposalPoints.Add(model);
-            await _context.SaveChangesAsync();
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                return StatusCode(500, "Ошибка при сохранении точки или связей типов отходов. Проверьте правильность WasteTypeId.");
+            }
 
             return CreatedAtAction(nameof(GetById), new { id = model.Id }, model);
         }

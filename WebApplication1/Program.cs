@@ -17,10 +17,11 @@ namespace WebApplication1
 
             builder.WebHost.ConfigureKestrel(o =>
             {
-                o.ListenLocalhost(5000);
+                // Вместо ListenLocalhost используй ListenAnyIP
+                o.ListenAnyIP(5000);
             });
 
-            
+
             builder.Services.AddCors(options =>
             {
                 options.AddPolicy("AllowMobileApp", policy =>

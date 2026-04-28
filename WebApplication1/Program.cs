@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using System.Text;
 using WebApplication1.Data;
 using WebApplication1.Service;
+using WebApplication1.Hubs;
 
 namespace WebApplication1
 {
@@ -17,7 +18,7 @@ namespace WebApplication1
 
             builder.WebHost.ConfigureKestrel(o =>
             {
-                // Вместо ListenLocalhost используй ListenAnyIP
+                
                 o.ListenAnyIP(5000);
             });
 
@@ -63,6 +64,22 @@ namespace WebApplication1
                         IssuerSigningKey = new SymmetricSecurityKey(
                             Encoding.UTF8.GetBytes(jwt.Secret))
                     };
+
+                    options.Events = new JwtBearerEvents
+                    {
+                        OnMessageReceived = context =>
+                        {
+                            var accessToken = context.Request.Query["access_token"];
+
+                            // Если запрос идет к хабу SignalR
+                            var path = context.HttpContext.Request.Path;
+                            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/supportChat"))
+                            {
+                                context.Token = accessToken;
+                            }
+                            return Task.CompletedTask;
+                        }
+                    };
                 });
 
             builder.Services.AddAuthorization(options =>
@@ -73,7 +90,7 @@ namespace WebApplication1
             });
 
             builder.Services.AddControllers();
-
+            builder.Services.AddSignalR();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(options =>
             {
@@ -132,7 +149,7 @@ namespace WebApplication1
 
             
             app.MapControllers();
-
+            app.MapHub<SupportHub>("/supportChat");
             app.Run();
         }
     }

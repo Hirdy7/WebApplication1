@@ -175,7 +175,7 @@ namespace WebApplication1.Controllers
             {
                 // Проверка: желательно, чтобы при отказе была указана причина
                 if (string.IsNullOrWhiteSpace(dto.Response))
-                {
+                {   
                     return BadRequest("При отказе необходимо указать причину в поле Response");
                 }
 

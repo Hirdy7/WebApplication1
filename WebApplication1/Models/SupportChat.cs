@@ -8,7 +8,7 @@
 
         // Поможет модератору фильтровать активные обращения
         public bool IsClosed { get; set; }
-
+        public bool IsWaitingForModerator { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime LastMessageAt { get; set; } = DateTime.UtcNow; // Для сортировки списка чатов
 

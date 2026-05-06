@@ -67,13 +67,41 @@ public class ChatController : ControllerBase
         return Ok();
     }
 
+    // 1. Получение истории конкретного чата для модератора
+    [HttpGet("{chatId}/messages")]
+    [Authorize(Policy = "ModeratorOnly")] // Только модератор может лезть в чужие чаты
+    public async Task<IActionResult> GetChatMessages(Guid chatId)
+    {
+        var messages = await _context.SupportMessages
+            .Where(m => m.ChatId == chatId)
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => new {
+                m.Text,
+                m.SenderId,
+                m.CreatedAt,
+                // Здесь логика простая: если отправитель НЕ тот, кто создал чат — значит это ответ саппорта
+                isSupportReply = m.IsSupportReply
+            })
+            .ToListAsync();
+
+        return Ok(messages);
+    }
+
+    // 2. Обновим твой метод, чтобы он возвращал реальные данные
     [HttpGet("active-requests")]
     public async Task<IActionResult> GetActiveRequests()
     {
         var requests = await _context.SupportChats
-            .Where(c => c.IsWaitingForModerator) // Только те, кто нажал кнопку
-            .Select(c => new { c.Id, c.User.Name, LastMessage = "..." })
+            .Where(c => !c.IsClosed) // Показываем все открытые чаты
+            .OrderByDescending(c => c.LastMessageAt) // Свежие сверху
+            .Select(c => new {
+                c.Id,
+                Name = c.User.Name ?? "Пользователь",
+                isWaiting = c.IsWaitingForModerator,
+                lastMessageAt = c.LastMessageAt
+            })
             .ToListAsync();
+
         return Ok(requests);
     }
 }

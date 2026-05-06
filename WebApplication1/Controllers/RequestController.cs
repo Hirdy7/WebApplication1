@@ -199,5 +199,7 @@ namespace WebApplication1.Controllers
                 totalUserPoints = request.User.TotalPoints
             });
         }
+
+
     }
 }

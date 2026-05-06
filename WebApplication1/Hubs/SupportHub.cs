@@ -22,14 +22,15 @@
             var userIdString = Context.UserIdentifier;
             if (!Guid.TryParse(userIdString, out var senderId)) return;
 
-            // 1. Ищем чат в базе
             var chat = await _context.SupportChats
                 .Include(c => c.Messages)
                 .FirstOrDefaultAsync(c => c.Id == chatId);
 
             if (chat == null) return;
 
-            // 2. Создаем новое сообщение на основе твоей модели SupportMessage
+            // Определяем, является ли отправитель модератором
+            bool isSupport = chat.UserId != senderId;
+
             var newMessage = new SupportMessage
             {
                 Id = Guid.NewGuid(),
@@ -37,25 +38,26 @@
                 SenderId = senderId,
                 Text = text,
                 CreatedAt = DateTime.UtcNow,
-                IsRead = false
+                IsRead = false,
+                IsSupportReply = isSupport // Устанавливаем флаг
             };
 
-            // 3. Сохраняем в базу
             _context.SupportMessages.Add(newMessage);
+
+            // Обновляем время последнего сообщения в чате для сортировки в сайдбаре
+            chat.LastMessageAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
 
-            // 4. Определяем, кому отправить сообщение
-            // Если отправитель — это владелец чата (клиент), то шлем модераторам
-            // Если отправитель не владелец (значит модератор), шлем клиенту
-            if (chat.UserId == senderId)
+            // Отправляем сообщение ВСЕМ участникам, включая отправителя для подтверждения
+            // Или используем логику разделения, как у вас, но с флагом isSupport
+            if (!isSupport)
             {
-                // Отправляем всем модераторам в специальную группу
-                await Clients.Group("Moderators").SendAsync("ReceiveMessage", chatId, senderId, text, newMessage.CreatedAt);
+                await Clients.Group("Moderators").SendAsync("ReceiveMessage", chatId, senderId, text, newMessage.CreatedAt, isSupport);
             }
             else
             {
-                // Отправляем конкретному клиенту — владельцу чата
-                await Clients.User(chat.UserId.ToString()).SendAsync("ReceiveMessage", chatId, senderId, text, newMessage.CreatedAt);
+                await Clients.User(chat.UserId.ToString()).SendAsync("ReceiveMessage", chatId, senderId, text, newMessage.CreatedAt, isSupport);
             }
         }
 

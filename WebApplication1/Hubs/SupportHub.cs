@@ -3,7 +3,7 @@
     using Microsoft.AspNetCore.SignalR;
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.EntityFrameworkCore;
-    using WebApplication1.Models; // Замени на свой namespace
+    using WebApplication1.Models;
     using WebApplication1.Data;
 
     [Authorize]
@@ -16,22 +16,26 @@
             _context = context;
         }
 
-        // Метод для отправки сообщения (используется и клиентом, и модератором)
         public async Task SendMessage(Guid chatId, string text)
         {
             var userIdString = Context.UserIdentifier;
-            if (!Guid.TryParse(userIdString, out var senderId)) return;
+
+            if (!Guid.TryParse(userIdString, out var senderId))
+                return;
 
             var chat = await _context.SupportChats
-                .Include(c => c.Messages)
                 .FirstOrDefaultAsync(c => c.Id == chatId);
 
-            if (chat == null) return;
+            if (chat == null)
+                return;
 
-            // Определяем, является ли отправитель модератором
-            bool isSupport = chat.UserId != senderId;
+            // Теперь считаем ответом поддержки, если пишет либо Модератор, либо Админ
+            bool isSupport = Context.User.IsInRole("Moderator") || Context.User.IsInRole("Admin");
 
-            var newMessage = new SupportMessage
+            // Если же логика "isSupport" должна базироваться строго на том, что пишет НЕ владелец чата:
+            // bool isSupport = chat.UserId != senderId;
+
+            var message = new SupportMessage
             {
                 Id = Guid.NewGuid(),
                 ChatId = chatId,
@@ -39,32 +43,34 @@
                 Text = text,
                 CreatedAt = DateTime.UtcNow,
                 IsRead = false,
-                IsSupportReply = isSupport // Устанавливаем флаг
+                IsSupportReply = isSupport
             };
 
-            _context.SupportMessages.Add(newMessage);
-
-            // Обновляем время последнего сообщения в чате для сортировки в сайдбаре
+            _context.SupportMessages.Add(message);
             chat.LastMessageAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
 
-            // Отправляем сообщение ВСЕМ участникам, включая отправителя для подтверждения
-            // Или используем логику разделения, как у вас, но с флагом isSupport
-            if (!isSupport)
+            var payload = new
             {
-                await Clients.Group("Moderators").SendAsync("ReceiveMessage", chatId, senderId, text, newMessage.CreatedAt, isSupport);
-            }
-            else
-            {
-                await Clients.User(chat.UserId.ToString()).SendAsync("ReceiveMessage", chatId, senderId, text, newMessage.CreatedAt, isSupport);
-            }
+                chatId,
+                senderId,
+                text,
+                createdAt = message.CreatedAt,
+                isSupportReply = isSupport
+            };
+
+            // Отправляем пользователю (владельцу чата)
+            await Clients.User(chat.UserId.ToString()).SendAsync("ReceiveMessage", payload);
+
+            // Отправляем всем сотрудникам (и админам, и модераторам) в группу
+            await Clients.Group("Moderators").SendAsync("ReceiveMessage", payload);
         }
 
-        // Метод для подключения к группе модераторов (вызывается модератором при входе в админку)
         public async Task JoinModeratorGroup()
         {
-            if (Context.User.IsInRole("Moderator"))
+            // ИСПРАВЛЕНИЕ: Добавляем проверку на обе роли
+            if (Context.User.IsInRole("Moderator") || Context.User.IsInRole("Admin"))
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, "Moderators");
             }

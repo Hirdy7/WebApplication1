@@ -104,4 +104,38 @@ public class ChatController : ControllerBase
 
         return Ok(requests);
     }
+
+    [HttpPost("close-chat")]
+    public async Task<IActionResult> CloseChat([FromBody] Guid chatId)
+    {
+        var userId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+        var isAdminOrModerator = User.IsInRole("Admin") || User.IsInRole("Moderator");
+
+        // Ищем чат
+        var chat = await _context.SupportChats.FirstOrDefaultAsync(c => c.Id == chatId);
+        if (chat == null) return NotFound();
+
+        // Проверка прав: закрыть может либо владелец чата, либо персонал (мод/админ)
+        if (chat.UserId != userId && !isAdminOrModerator)
+        {
+            return Forbid();
+        }
+
+        // Обновляем состояние
+        chat.IsClosed = true;
+        chat.IsWaitingForModerator = false;
+
+        await _context.SaveChangesAsync();
+
+        // 3. Уведомляем участников через SignalR
+        // Отправляем системное событие "ChatClosed"
+
+        // Пользователю
+        await _hubContext.Clients.User(chat.UserId.ToString()).SendAsync("ChatClosed", chatId);
+
+        // Модераторам (чтобы чат пропал из списка активных или пометился закрытым)
+        await _hubContext.Clients.Group("Moderators").SendAsync("ChatClosed", chatId);
+
+        return Ok(new { message = "Диалог завершен" });
+    }
 }

@@ -7,6 +7,7 @@ using System.Text;
 using WebApplication1.Data;
 using WebApplication1.Service;
 using WebApplication1.Hubs;
+using Microsoft.AspNetCore.SignalR;
 
 namespace WebApplication1
 {
@@ -91,6 +92,7 @@ namespace WebApplication1
 
             builder.Services.AddControllers();
             builder.Services.AddSignalR();
+            builder.Services.AddSingleton<IUserIdProvider, CustomUserIdProvider>();
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen(options =>
             {
